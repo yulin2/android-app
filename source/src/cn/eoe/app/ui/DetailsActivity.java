@@ -70,6 +70,8 @@ public class DetailsActivity extends BaseActivity implements OnClickListener {
     private DetailDB mDetailDB;
     private String mKey;
     private int mDBID = -1;
+    
+    private AsyncTask<Void, Void, Void> initAppraiseTask;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -85,7 +87,13 @@ public class DetailsActivity extends BaseActivity implements OnClickListener {
         mKey = sharePre.getString(UserLoginUidActivity.KEY, "");
         initData();
         initControl();
-        initAppraise();
+        initAppraiseTask = new AsyncTask<Void, Void, Void>() {
+            @Override
+            protected Void doInBackground(Void... params) {
+                initAppraise();
+                return null;
+            }
+        }.execute();
     }
 
     private void initData() {
@@ -193,16 +201,32 @@ public class DetailsActivity extends BaseActivity implements OnClickListener {
         if (mKey.equals(null) && mKey.equals("")) {
             return;
         }
-        if (mDBID == -1 && (IsGood || IsBed || IsCollect)) {
-            // 添加
-            mDetailDB.insertSQL(mUrl, mKey, IsGood ? 1 : 0, IsBed ? 1 : 0,
-                    IsCollect ? 1 : 0);
-        } else if (mDBID != -1) {
-            // 修改
-            mDetailDB.updateSQL(mDBID, IsGood ? 1 : 0, IsBed ? 1 : 0,
-                    IsCollect ? 1 : 0);
-        }
-        mDetailDB.dbClose();
+        new AsyncTask<Void, Void, Void>() {
+            @Override
+            protected void onPreExecute() {
+                // synchronize with initAppraiseTask
+                try {
+                    initAppraiseTask.get();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+            
+            @Override
+            protected Void doInBackground(Void... params) {
+                if (mDBID == -1 && (IsGood || IsBed || IsCollect)) {
+                    // 添加
+                    mDetailDB.insertSQL(mUrl, mKey, IsGood ? 1 : 0, IsBed ? 1 : 0,
+                            IsCollect ? 1 : 0);
+                } else if (mDBID != -1) {
+                    // 修改
+                    mDetailDB.updateSQL(mDBID, IsGood ? 1 : 0, IsBed ? 1 : 0,
+                            IsCollect ? 1 : 0);
+                }
+                mDetailDB.dbClose();
+                return null;
+            }
+        }.execute();
     }
 
     class MyTask extends AsyncTask<String, Integer, String> {
@@ -277,6 +301,14 @@ public class DetailsActivity extends BaseActivity implements OnClickListener {
             showLongToast(getResources().getString(R.string.user_login_prompt));
             return;
         }
+        
+        // synchronize with initAppraiseTask
+        try {
+            initAppraiseTask.get();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        
         String url = null;
         switch (v.getId()) {
             case R.id.rlGood:
