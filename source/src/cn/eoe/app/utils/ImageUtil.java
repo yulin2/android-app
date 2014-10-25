@@ -20,9 +20,11 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.BitmapFactory.Options;
 import android.graphics.Rect;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Environment;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.Message;
 import android.util.Log;
 import android.widget.ImageView;
@@ -116,16 +118,24 @@ public class ImageUtil {
 	private static void setThumbnailImage(ImageView view, String imageUrl,
 			String cachePath, DBHelper dbHelper, ImageCallback callback,
 			boolean b) {
-		Bitmap bitmap = null;
-		bitmap = ImageUtil.loadThumbnailImage(cachePath, imageUrl, dbHelper,
-				callback, b);
-		if (bitmap == null) {// 先查找数据库，再查找本地sd卡,若没有.再从网站加载，若网站上没有图片或错误时返回null
-			// 设置默认图片
-			view.setImageResource(Default_Img);
-		} else {
-			// 设置本地SD卡缓存图片
-			view.setImageBitmap(bitmap);
-		}
+		new AsyncTask<Void, Void, Bitmap>() {
+			@Override
+			protected Bitmap doInBackground(Void... params) {
+				return ImageUtil.loadThumbnailImage(cachePath, imageUrl, dbHelper,
+						callback, b);
+			}
+			
+			@Override
+			protected void onPostExecute(Bitmap bitmap) {
+				if (bitmap == null) {// 先查找数据库，再查找本地sd卡,若没有.再从网站加载，若网站上没有图片或错误时返回null
+					// 设置默认图片
+					view.setImageResource(Default_Img);
+				} else {
+					// 设置本地SD卡缓存图片
+					view.setImageBitmap(bitmap);
+				}
+			}
+		}.execute();
 	}
 
 	private static Bitmap getImageFromDB(String imagePath, String imageUrl,
@@ -297,7 +307,7 @@ public class ImageUtil {
 			return bitmap;
 		} else {
 			// 从网上加载
-			final Handler handler = new Handler() {
+			final Handler handler = new Handler(Looper.getMainLooper()) {
 				@Override
 				public void handleMessage(Message msg) {
 					if (msg.obj != null) {
